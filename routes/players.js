@@ -6,13 +6,35 @@ var Combinatorics = require('js-combinatorics');
 const mongoose = require('mongoose');
 
 mongoose.connect('mongodb://localhost/cartola');
+
 var Schema = mongoose.Schema
 var playerSchema = new Schema({})
 var Player = mongoose.model('players', playerSchema);
 
+var cache = {}
 /* GET users listing. */
 router.get('/:treshhold', function(req, res, next) {
-  const treshhold = req.params['treshhold'] || 100
+  const treshhold = parseInt(req.params['treshhold'])
+  if (cache[treshhold]) {
+    res.json({players: cache[treshhold]})
+  } else {
+    getPlayers(treshhold, best => {
+      if (!best){
+        best = []
+      }
+  
+      _.range(Math.ceil(sumPrice(best)),treshhold + 1)
+      .forEach(price => {
+        cache[price] = best
+      })
+      //console.log(best)
+      console.log(`${sumPrice(best)} - ${sumAverage(best)}`)
+      res.json({players: best});
+    })  
+  }
+});
+
+function getPlayers(treshhold, callback) {
   Player.find((err,players) => {
     var groupedPlayers = _.chain(players)
     .map(({_doc}) => _doc)
@@ -81,14 +103,9 @@ router.get('/:treshhold', function(req, res, next) {
         })
       })
     })
-    if (!best){
-      best = []
-    }
-    //console.log(best)
-    console.log(`${sumPrice(best)} - ${sumAverage(best)}`)
-    res.json({players: best});
+    callback(best)
   })
-});
+}
 
 function print(x){
   return console.log(x)
