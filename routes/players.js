@@ -1,11 +1,13 @@
 var express = require('express');
 var router = express.Router();
+var request = require('request')
+
 var _ = require('lodash')
 var Combinatorics = require('js-combinatorics');
 
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://localhost/cartola');
+mongoose.connect('mongodb://mongo/cartola');
 
 var Schema = mongoose.Schema
 var playerSchema = new Schema({})
@@ -22,7 +24,7 @@ router.get('/:treshhold', function(req, res, next) {
       if (!best){
         best = []
       }
-  
+      
       _.range(Math.ceil(sumPrice(best)),treshhold + 1)
       .forEach(price => {
         cache[price] = best
@@ -35,20 +37,24 @@ router.get('/:treshhold', function(req, res, next) {
 });
 
 function getPlayers(treshhold, callback) {
-  Player.find((err,players) => {
-    var groupedPlayers = _.chain(players)
-    .map(({_doc}) => _doc)
-    .groupBy(player => player.position_id)
+  request.get("http://naming-service:4000/lookup?name=cartola-rest-api", (err, res, url) => {
+  if (err) {
+    console.log(err)
+  }
+  request.get(`${url}/players`, (err,res,players) => {
+    if (err) {
+      console.log(err)
+    }
+    var groupedPlayers = _(JSON.parse(players)).groupBy(player => player.position_id)
+    console.log(groupedPlayers.at(3).first())
+    const zagueiros = removerLixo(groupedPlayers.at(3).first(),2)
+    const laterais = removerLixo(groupedPlayers.at(2).first(),2)
+    const meias = removerLixo(groupedPlayers.at(4).first(),3)
+    const atacantes = removerLixo(groupedPlayers.at(5).first(),3)
     
     
-    const zagueiros = removerLixo(groupedPlayers.at(3).first().value(),2)
-    const laterais = removerLixo(groupedPlayers.at(2).first().value(),2)
-    const meias = removerLixo(groupedPlayers.at(4).first().value(),3)
-    const atacantes = removerLixo(groupedPlayers.at(5).first().value(),3)
-    
-    
-    const goleiros = removerLixo(groupedPlayers.at(1).first().value(),1)
-    const tecnicos = removerLixo(groupedPlayers.at(6).first().value(),1)
+    const goleiros = removerLixo(groupedPlayers.at(1).first(),1)
+    const tecnicos = removerLixo(groupedPlayers.at(6).first(),1)
     
     const combZa = removerLixoCombinacao(Combinatorics.bigCombination(zagueiros,2).toArray())
     const combLa = removerLixoCombinacao(Combinatorics.bigCombination(laterais,2).toArray())
@@ -60,9 +66,9 @@ function getPlayers(treshhold, callback) {
     const total = combZa.length * combLa.length * combMe.length * combAt.length  * tecnicos.length * goleiros.length
     print(`total de combinacoes: ${total}`)
     var best = undefined
-
+    
     goleiros.forEach(gol => {
-
+      
       if(sumPrice(_.concat([gol])) > treshhold){
         return
       }
@@ -105,6 +111,7 @@ function getPlayers(treshhold, callback) {
     })
     callback(best)
   })
+})
 }
 
 function print(x){
@@ -119,7 +126,7 @@ function sumAverage(combination){
 }
 
 function removerLixoCombinacao(combinacoes){
-
+  
   var result = []
   
   result = _(combinacoes)
